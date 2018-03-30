@@ -1,5 +1,7 @@
 package com.kopochaeproject
 
+import org.apache.spark.sql.SparkSession
+
 object Ex04 {
   def main(args: Array[String]): Unit = {
     def result(a:String) :(Int, Int) = {

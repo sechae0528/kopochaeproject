@@ -21,6 +21,11 @@ object Example_Join {
   mainData.createTempView("maindata")
   subData.createTempView("subdata")
 
+  //left join하는 방법
+  var leftJoinData = spark.sql("select a.*, b.product_new " + "from mainData a left outer join subData b " +
+    "on a.productgroup = b.product_org")
+
+
 
 
 

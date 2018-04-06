@@ -24,12 +24,24 @@ object Ex05 {
   mainData1.show()
   subData1.show()
 
-  var innerJoinData = spark.sql("select a.regionid, b.regionname, a.product, a.yearweek, a.qty " +
-    "from maindata1 a inner join subdata1 b " +
+
+  //컬럼명을 소문자에서 대문자로 꼭 바뀌어주어야한다.
+  //컬럼명이 소문자일시 오라클에서 정렬을 할때, order by A, B,C 이런식으로 가져올 수 있다.
+  var innerJoinData = spark.sql("select a.regionid AS REGIONID, " +
+    "b.regionname AS REGIONNAME, " +
+    "a.product AS PRODUCT, " +
+    "a.yearweek AS YEARWEEK, " +
+    "a.qty AS QTY" +
+    "from maindata1 a " +
+    "inner join subdata1 b " +
     "on a.regionid = b.regionid")
 
 
-  var leftJoinData = spark.sql("select a.regionid, a.product, a.yearweek, cast(a.qty as Double), cast(b.regionname as String) " +
+  var leftJoinData = spark.sql("select a.regionid AS REGIONID, " +
+    "a.product AS PRODUCT, " +
+    "a.yearweek AS YEARWEEK, " +
+    "cast(a.qty as Double) AS QTY, " +
+    "cast(b.regionname as String) " +
     "from maindata1 a left join subdata1 b " +
     "on a.regionid = b.regionid")
 

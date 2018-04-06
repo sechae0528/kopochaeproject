@@ -57,7 +57,8 @@ object Ex05 {
     leftJoinData.write.mode("overwrite").jdbc(outputUrl, table, prop)
 
 
-
+//한글 깨지지않게 rdd로 저장방법
+  leftJoinData.rdd.coalesce(1).map { x =>x.mkString(",") }.saveAsTextFile("e:/test/test3.csv")
 
 
 }

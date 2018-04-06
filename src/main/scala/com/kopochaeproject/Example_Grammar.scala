@@ -27,7 +27,7 @@ object Example_Grammar {
     var promotionRate = 0.2
     var priceDataSize = priceData.size
 
-    for(i <-0 to priceDataSize-1){
+    for(i <-0 until priceDataSize){ //i <-0 to priceDataSize-1
       var promotionEffect = priceData(i) * promotionRate
       priceData(i) = priceData(i) - promotionEffect
     }

@@ -14,7 +14,7 @@ object Example_JoinFromOracle {
     var staticUser = "kopo"
     var staticPw = "kopo"
     var selloutDb = "kopo_channel_seasonality_new"
-    var masterDb = "kopo_region_mst"
+    var masterDb = "kopo_product_master"
 
     val selloutDf = spark.read.format("jdbc").option("encoding", "UTF-8").
       options(Map("url" -> staticUrl, "dbtable" -> selloutDb, "user" -> staticUser, "password" -> staticPw)).load
@@ -27,14 +27,26 @@ object Example_JoinFromOracle {
     mstDf.createOrReplaceTempView("mstTable")
 
     var resultDf = spark.sql("select " +
+      "concat(a.regionid, concat('_',a.product)) AS KEYCOL, "+
       "a.regionid AS REGIONID, " +
       "a.product AS PRODUCT, " +
       "a.yearweek AS YEARWEEK, " +
       "cast(qty as double) AS QTY, " +
-      "b.regionname AS REGIONNAME " +
+      "b.productname AS PRODUCTNAME " +
       "from selloutTable A " +
       "left join mstTable B " +
-      "on a.regionid = b.regionid")
+      "on a.product = b.productid")
+
+    var resultDf = spark.sql("select " +
+      "concat(a.regionid,'_',a.product) AS KEYCOL, "+
+      "a.regionid AS REGIONID, " +
+      "a.product AS PRODUCT, " +
+      "a.yearweek AS YEARWEEK, " +
+      "cast(qty as double) AS QTY, " +
+      "b.productname AS PRODUCTNAME " +
+      "from selloutTable A " +
+      "left join mstTable B " +
+      "on a.product = b.productid")
 
 
     var myUrl = "jdbc:oracle:thin:@127.0.0.1:1522/XE"

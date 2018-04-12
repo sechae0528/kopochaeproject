@@ -37,9 +37,9 @@ object Example_JoinFromOracle {
       "left join mstTable B " +
       "on a.product = b.productid")
 
-    var resultDf = spark.sql("select " +
+    var rawData = spark.sql("select " +
       "concat(a.regionid,'_',a.product) AS KEYCOL, "+
-      "a.regionid AS REGIONID, " +
+      "a.regionid AS ACCOUNTID, " +
       "a.product AS PRODUCT, " +
       "a.yearweek AS YEARWEEK, " +
       "cast(qty as double) AS QTY, " +
@@ -47,6 +47,25 @@ object Example_JoinFromOracle {
       "from selloutTable A " +
       "left join mstTable B " +
       "on a.product = b.productid")
+
+
+    //컬럼에 인덱스 생성
+
+    var rawDataColumns = rawData.columns
+
+    var keyNo = rawDataColumns.indexOf("KEYCOL")
+    var accountidNo = rawDataColumns.indexOf("ACCOUNTID")
+    var productNo = rawDataColumns.indexOf("PRODUCT")
+    var yearweekNo = rawDataColumns.indexOf("YEARWEEK")
+    var qtyNo = rawDataColumns.indexOf("QTY")
+    var productnameNo = rawDataColumns.indexOf("PRODUCTNAME")
+
+
+
+
+
+
+
 
 
     var myUrl = "jdbc:oracle:thin:@127.0.0.1:1522/XE"
@@ -68,7 +87,7 @@ object Example_JoinFromOracle {
     //startup
 
 
-    resultDf.
+    rawData.
       coalesce(1). // 파일개수
       write.format("csv").  // 저장포맷
       mode("overwrite"). // 저장모드 append/overwrite
@@ -77,7 +96,7 @@ object Example_JoinFromOracle {
       save("e:/resultdf2.csv")
     //ISO-8859-1 ISO-8859-1
 
-    resultDf.rdd.coalesce(1).map { x =>x.mkString(",") }.saveAsTextFile("e:/test/test3.csv")
+    rawData.rdd.coalesce(1).map { x =>x.mkString(",") }.saveAsTextFile("e:/test/test3.csv")
 
 
   }

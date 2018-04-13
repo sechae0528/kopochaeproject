@@ -61,10 +61,28 @@ object Example_JoinFromOracle {
     var productnameNo = rawDataColumns.indexOf("PRODUCTNAME")
 
 
+   // 컬럼 배열확인방법 (QTY가 4번째에 있는 것을 확인)
+    rawDataColumns.indexOf("QTY")
 
+    //컬럼명이 들어있는 지 확인할 때, 먼저 Set으로 만들어준다.
+    var dataSet = rawDataColumns.toSet
+    //다음 contains으로 컬럼명에 QTY가 있는지 확인.
+    rawDataColumns.contains("QTY")
 
+    //컬럼명 바꿀 때,
+    var testDf = rawData.toDF("AA","BB","CC","DD","EE","FF")
+    //컬럼명이 바뀌고 생성된 데이터를 볼 수 있음.
+    testDf.show(1)
 
-
+    //대소문자상관없이 같은지 확인하고 싶을 때,
+    //첫번째 방법
+    var test1 = "aabbCCDD"
+    var test2 = "AABBCCdd"
+    test1.equalsIgnoreCase(test2)
+    //두번째 방법 (둘다 소문자로 바꾸고 확인하는 방법)
+    var a = test1.toLowerCase()
+    var b = test2.toLowerCase()
+    a== b
 
 
 
@@ -97,6 +115,61 @@ object Example_JoinFromOracle {
     //ISO-8859-1 ISO-8859-1
 
     rawData.rdd.coalesce(1).map { x =>x.mkString(",") }.saveAsTextFile("e:/test/test3.csv")
+
+    //RDD 변환
+    var rawRdd = rawData.rdd
+
+    //RDD 처리(데이터 정제)
+    //(KECOL, ACCOUNTID, PRODUCT, YEARWEEK, QTY, PRODUCTNAME)
+    var filterexRdd = rawRdd.filter(x=> {
+      // 데이터 한줄씩 들어옴
+      var checkValid = true
+      // 그중 특정 컬럼값
+      var yearweek = x.getString(yearweekNo)
+
+      if(yearweek.length != 6){
+        checkValid = false
+      }
+      //if(x.getString(yearweekNo).length != 6) {checkValid = false}
+      checkValid
+    })
+
+
+    //디버깅 방법 (case1)
+    var filterexRdd1 = rawRdd
+    var x = filterexRdd1.first
+
+
+    //디버깅 방법 (case2)
+    var filterex2Rdd = rawRdd.filter(x=>{
+      (x.getString(yearweekNo) == "201512")
+    })
+    var x1 = filterex2Rdd.first
+
+    var filterex3Rdd = rawRdd.filter(x=>{
+      var checkValid = false
+      if((x.getString(accountidNo) =="A60") &&
+        (x.getString(productNo) == "PRODUCT34") &&
+        (x.getString(yearweekNo) == "201402")){
+        checkValid = true
+      }
+      checkValid
+    })
+    var x2 = filterex3Rdd.first
+
+    var filterex4Rdd = rawRdd.filter(x2=>{
+      var checkValid = true
+      if (x2.getString(yearweekNo).substring(4,2) > "52" ){
+        checkValid = false
+      }
+      checkValid
+    })
+
+s
+    //필터된 데이터 갯수를 확인하고 싶을 때,
+    filterexRdd.count()
+
+
 
 
   }

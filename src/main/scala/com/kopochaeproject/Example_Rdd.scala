@@ -1,7 +1,9 @@
 package com.kopochaeproject
-import org.apache.spark.sql.SparkSession;
 
-class Example_Rdd {
+import org.apache.spark.sql.SparkSession
+
+object Example_Rdd {
+
   def main(args: Array[String]): Unit = {
 
     val spark = SparkSession.builder().appName("hkProject").
@@ -76,7 +78,7 @@ class Example_Rdd {
     var rawRdd = rawData.rdd
 
     //필터예제 : 자신이 생성한 Rdd에 연주차 정보가 52보다 큰 값은 제거하는 로직직
-   var filteredRdd = rawRdd.filter(x => {
+    var filteredRdd = rawRdd.filter(x => {
       //boolean = true
       var checkValid = true
       // 찾기 : yearweek 인덱스로 주차정보만 인트타입으로 변환

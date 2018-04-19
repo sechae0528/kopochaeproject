@@ -2,9 +2,14 @@ package com.kopochaeproject
 
 import org.apache.spark.sql.SparkSession
 
+//Rdd에서 Dataframe으로 변환시 타입 import 해주기!!
+import org.apache.spark.sql.types.{StringType, DoubleType, StructField, StructType}
+
 object Example_Rdd {
 
   def main(args: Array[String]): Unit = {
+
+
 
     val spark = SparkSession.builder().appName("hkProject").
       config("spark.master", "local").
@@ -75,8 +80,12 @@ object Example_Rdd {
     //컬럼명이 바뀌고 생성된 데이터를 볼 수 있음.
     testDf.show(1)
 
+
+    /////////////////////////////////////RDD로 변환 ///////////////////////////
     var rawRdd = rawData.rdd
 
+
+    //////////////////////////////RDD로 변환 후 정제하기 ///////////////////////////
     //필터예제 : 자신이 생성한 Rdd에 연주차 정보가 52보다 큰 값은 제거하는 로직직
     var filteredRdd = rawRdd.filter(x => {
       //boolean = true
@@ -120,6 +129,24 @@ object Example_Rdd {
       }
       checkValid
     })
+
+    //////////////////////// 데이터형 변환 [RDD → Dataframe]////////////////////////////////////
+//    var {DataFrame 변수명} = spark.createDataframe( {RDD명},
+//      StructType(Seq( StructField( “컬럼명#1”, 데이터타입#1),
+//    StructField( “컬럼명#2”, 데이터타입#2))
+    val finalResultDf = spark.createDataFrame(resultRdd,
+    StructType(
+    Seq(
+      StructField("KEYKOL", StringType),
+      StructField("REGIONID", StringType),
+      StructField("PRODUCT", StringType),
+      StructField("YEARWEEK", StringType),
+      StructField("QTY", DoubleType),
+      StructField("PRODUCTNAME", StringType))))
+
+
+
+
 
   }
 

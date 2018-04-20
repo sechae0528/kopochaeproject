@@ -52,5 +52,14 @@ object Example_Function {
     println("sum2 is "+sum2)
 
 
+    def subReturn(inputValue: String) : Int = {
+
+      var result = inputValue.substring(4).toInt
+
+      result
+
+
+    }
+
   }
 }

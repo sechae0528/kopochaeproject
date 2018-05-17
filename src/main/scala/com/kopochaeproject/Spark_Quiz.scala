@@ -21,7 +21,7 @@ object Spark_Quiz {
     def movingAverage(targetData: Array[Double], myorder: Int): Array[Double] = {
       val length = targetData.size
       if (myorder > length || myorder <= 2) {
-        throw new IllegalArgumentException
+        throw new IllegalArgumentException //오류,예외처리: 에러도 발생하지 않고, 올바르지 않은 결과를 리턴하지 않도록 수정
       } else {
         var maResult = targetData.sliding(myorder).map(_.sum).map(_ / myorder)
 

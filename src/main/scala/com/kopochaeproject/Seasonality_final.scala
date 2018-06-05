@@ -26,7 +26,7 @@ object Seasonality_final {
       } else {
         var maResult = targetData.sliding(myorder).map(x=>{x.sum}).map(x=>{ x/myorder })
 
-        if (myorder % 2 == 0) {
+        if (myorder % 2 == 0) { //짝수일 경우는 쓰지않지만 예외처리로서 사용
           maResult = maResult.sliding(2).map(x=>{x.sum}).map(x=>{ x/2 })
         }
         maResult.toArray
@@ -67,7 +67,7 @@ object Seasonality_final {
     //    joinData.createOrReplaceTempView("keydata")
     // 1. data loading
     //////////////////////////////////////////////////////////////////////////////////////////////////
-    var staticUrl = "jdbc:oracle:thin:@192.168.110.111:1521/orcl"
+    var staticUrl = "jdbc:oracle:thin:@192.168.110.112:1521/orcl"
     //staticUrl = "jdbc:oracle:thin:@192.168.110.111:1521/orcl"
     //staticUrl = "jdbc:oracle:thin:@127.0.0.1:1521/XE"
     var staticUser = "kopo"
@@ -167,11 +167,17 @@ object Seasonality_final {
         var data = x._2
 
         // 1. Sort Data
-        var sortedData = data.toSeq.sortBy(x=>{x.getString(yearweekNo).toInt})
+        var sortedData = data.toSeq.sortBy(x=>{x.getString(yearweekNo).toInt}) //연주차별로 순서대로 order by해주는곳
         var sortedDataIndex = sortedData.zipWithIndex
 
         var sortedVolume = sortedData.map(x=>{ (x.getDouble(qtyNo))}).toArray
         var sortedVolumeIndex = sortedVolume.zipWithIndex
+
+        //zipwithindex는 데이터가 있고 그 뒤에 인덱스를 다시 붙이는 작업
+        //11,0
+        //123,1
+        //43,2
+        //22,3
 
         var scope = 17
         var subScope = (scope.toDouble / 2.0).floor.toInt
@@ -180,7 +186,7 @@ object Seasonality_final {
         var movingResult = movingAverage(sortedVolume,scope)
 
         // 3. Generate value for weeks (out of moving average)
-        var preMAArray = new ArrayBuffer[Double]
+        var preMAArray = new ArrayBuffer[Double] //Array는 정해진 범위안에서만 가능 Buffer은 배열을 계속 추가할 수있다.
         var postMAArray = new ArrayBuffer[Double]
 
         var lastIndex = sortedVolumeIndex.size-1
@@ -206,6 +212,8 @@ object Seasonality_final {
 
         // 4. Merge all data-set for moving average
         var maResult = (preMAArray++movingResult++postMAArray.reverse).zipWithIndex
+
+        //zip() : zip안에 오는 데이터 값을 앞에 있는 데이터에 붙여서 보여준다.
 
         // 5. Generate final-result
         var finalResult = sortedDataIndex.

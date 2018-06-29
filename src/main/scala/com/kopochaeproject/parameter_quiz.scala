@@ -24,7 +24,7 @@ object parameter_quiz {
     import spark.implicits._
 
     var staticUrl = "jdbc:oracle:thin:@192.168.110.112:1521/orcl"
-    staticUrl = "jdbc:oracle:thin:@127.0.0.1:1521/XE"
+    //staticUrl = "jdbc:oracle:thin:@127.0.0.1:1521/XE"
     var staticUser = "kopo"
     var staticPw = "kopo"
     var selloutDb = "kopo_channel_seasonality_new"
@@ -62,7 +62,7 @@ object parameter_quiz {
       prop2.setProperty("driver", "org.postgresql.Driver")
       prop2.setProperty("user", staticUser)
       prop2.setProperty("password", staticPw)
-      rawData.write.mode("overwrite").jdbc(postUrl, "outResult", prop2)*/
+      rawData.write.mode("overwrite").jdbc(postUrl, "outResult1", prop2)*/
 
     /* var rawDataColumns = rawData.columns.map(x => {
        x.toLowerCase()
@@ -90,8 +90,10 @@ object parameter_quiz {
 
      // Define Map
      val parameterMap =
-       parametersDF.rdd.groupBy {x => (x.getString(pCategoryNo), x.getString(pNameNo))}.map(row => {
-         var paramValue = row._2.map(x=>{x.getString(pValueNo)}).toArray
+       parametersDF.rdd.groupBy {x => (x.getString(pCategoryNo), x.getString(pNameNo))}.
+       map(row => {
+         var data = row._2
+         var paramValue = data.map(x=>{x.getString(pValueNo)}).toArray
          ( (row._1._1, row._1._2), (paramValue) )
        }).collectAsMap
 

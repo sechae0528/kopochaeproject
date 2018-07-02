@@ -1,10 +1,11 @@
 package com.kopochaeproject
 
-object Seasonality_final {
+object Project1 {
   def main(args: Array[String]): Unit = {
     /////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////  Library Definition ////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////
+    import edu.princeton.cs.introcs.StdStats
     import org.apache.spark.sql.SparkSession
     import scala.collection.mutable.ArrayBuffer
     import org.apache.spark.sql.{DataFrame, Row, SQLContext, SaveMode}
@@ -18,7 +19,8 @@ object Seasonality_final {
     //   1. Array : targetData: inputsource
     //   2. Int   : myorder: section
     // output:
-    //   1. Array : result of moving average
+
+    //   1. Array : 이동평균
     def movingAverage(targetData: Array[Double], myorder: Int): Array[Double] = {
       val length = targetData.size
       if (myorder > length || myorder <= 2) {
@@ -32,6 +34,36 @@ object Seasonality_final {
         maResult.toArray
       }
     }
+
+    // 2. 변동률 계산(표준편차)
+    def stdevDf(targetData: Array[Double], myorder: Int): Array[Double] = {
+      val length = targetData.size
+      if (myorder > length || myorder <= 2) {
+        throw new IllegalArgumentException
+      } else {
+        var maResult = targetData.sliding(myorder).map(x => {x.sum}).map(x => {x / myorder})
+        var maResult1 = targetData.sliding(myorder).toArray
+        var stddev1 = new ArrayBuffer[Double]
+
+        for (i <- 0 until maResult1.length){
+          var maResult2 = maResult1(i)
+          var stddev = StdStats.stddev(maResult2)
+          stddev1.append(stddev)
+        }
+
+        if (myorder % 2 == 0) { //짝수일 경우는 쓰지않지만 예외처리로서 사용
+          maResult = maResult.sliding(2).map(x => {x.sum}).map(x => {x / 2})
+          for (i <- 0 until maResult1.length){
+            var maResult2 = maResult1(i)
+            var stddev = StdStats.stddev(maResult2)
+            stddev1.append(stddev)
+          }
+        }
+        stddev1.toArray
+      }
+
+    }
+
 
     ////////////////////////////////////  Spark-session definition  ////////////////////////////////////
     var spark = SparkSession.builder().config("spark.master","local").getOrCreate()
@@ -86,28 +118,23 @@ object Seasonality_final {
     // 2. data refining
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
-    //    var mainDataSelectSql = "select regionid, regionname, ap1id, ap1name, accountid, accountname," +
-    //      "salesid, salesname, productgroup, product, item," +
-    //      "yearweek, year, week, " +
-    //      "cast(qty as double) as qty," +
-    //      "cast(target as double) as target," +
-    //      "idx from selloutTable where 1=1"
-    var rawData = spark.sql("select concat(a.regionid,'_',a.product) as keycol," +
-      "a.regionid as accountid," +
-      "a.product," +
-      "a.yearweek," +
-      "cast(a.qty as String) as qty, " +
-      "'test' as productname from keydata a" )
+    //(1)음수(반품)는 0으로 고정
+    var rawData = spark.sql("select regionid as regionid," +
+      "a.product as product," +
+      "a.yearweek as yearweek," +
+      "cast(a.qty as String) as qty, "+
+      "cast(case When qty <= 0 then 1 else qty end as String) as qty_new " +
+      "from keydata a" )
 
     rawData.show(2)
 
+    //(2)인덱스설정
     var rawDataColumns = rawData.columns.map(x=>{x.toLowerCase()})
-    var keyNo = rawDataColumns.indexOf("keycol")
-    var accountidNo = rawDataColumns.indexOf("accountid")
+    var regionidNo = rawDataColumns.indexOf("regionid")
     var productNo = rawDataColumns.indexOf("product")
     var yearweekNo = rawDataColumns.indexOf("yearweek")
     var qtyNo = rawDataColumns.indexOf("qty")
-    var productnameNo = rawDataColumns.indexOf("productname")
+    var qtyNewNo = rawDataColumns.indexOf("qty_new")
 
     var rawRdd = rawData.rdd
 
@@ -115,6 +142,8 @@ object Seasonality_final {
     ////////////////////////////////////  Data Filtering         ////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////
     // The abnormal value is refined using the normal information
+
+    //(3) 52주차가 넘어가면 제거, 52주차까지만 필터링
     var filterEx1Rdd = rawRdd.filter(x=> {
 
       // Data comes in line by line
@@ -130,23 +159,23 @@ object Seasonality_final {
       checkValid
     })
 
-    var productList = Array("PRODUCT1","PRODUCT2").toSet
+//    var productList = Array("PRODUCT1","PRODUCT2").toSet
+//
+//    var filterRdd = filterEx1Rdd.filter(x=> {
+//      productList.contains(x.getString(productNo))
+//    })
 
-    var filterRdd = filterEx1Rdd.filter(x=> {
-      productList.contains(x.getString(productNo))
-    })
 
-    // key, account, product, yearweek, qty, productname
-    var mapRdd = filterRdd.map(x=>{
+    // (4) qty, qty_new 형변환 : double
+    var mapRdd = filterEx1Rdd.map(x=>{
       var qty = x.getString(qtyNo).toDouble
-      var maxValue = 700000
-      if(qty > 700000){qty = 700000}
-      Row( x.getString(keyNo),
-        x.getString(accountidNo),
+      var qty_new = x.getString(qtyNewNo).toDouble
+
+      Row( x.getString(regionidNo),
         x.getString(productNo),
         x.getString(yearweekNo),
         qty, //x.getString(qtyNo),
-        x.getString(productnameNo))
+        qty_new)
     })
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,8 +188,8 @@ object Seasonality_final {
     // 4. Merge all data-set for moving average
     // 5. Generate final-result
     // (key, account, product, yearweek, qty, productname)
-    var groupRddMapExp = mapRdd.
-      groupBy(x=>{ (x.getString(keyNo), x.getString(accountidNo)) }).
+    var groupRddMapExp1 = mapRdd.
+      groupBy(x=>{ (x.getString(regionidNo), x.getString(productNo)) }).
       flatMap(x=>{
 
         var key = x._1
@@ -170,7 +199,7 @@ object Seasonality_final {
         var sortedData = data.toSeq.sortBy(x=>{x.getString(yearweekNo).toInt}) //연주차별로 순서대로 order by해주는곳
         var sortedDataIndex = sortedData.zipWithIndex
 
-        var sortedVolume = sortedData.map(x=>{ (x.getDouble(qtyNo))}).toArray
+        var sortedVolume = sortedData.map(x=>{ (x.getDouble(qtyNewNo))}).toArray
         var sortedVolumeIndex = sortedVolume.zipWithIndex
 
         //zipwithindex는 데이터가 있고 그 뒤에 인덱스를 다시 붙이는 작업
@@ -179,17 +208,26 @@ object Seasonality_final {
         //43,2
         //22,3
 
-        var scope = 17
+        var scope = 13
+        var scope1 = 5
         var subScope = (scope.toDouble / 2.0).floor.toInt
+        var subScope1 = (scope1.toDouble / 2.0).floor.toInt
 
         // 2. Calculate moving average
         var movingResult = movingAverage(sortedVolume,scope)
+
+        //변동률구하기 : 표준편차
+        var stdevResult = stdevDf(sortedVolume,scope1)
 
         // 3. Generate value for weeks (out of moving average)
         var preMAArray = new ArrayBuffer[Double] //Array는 정해진 범위안에서만 가능 Buffer은 배열을 계속 추가할 수있다.
         var postMAArray = new ArrayBuffer[Double]
 
+        var preMAArray1 = new ArrayBuffer[Double]
+        var postMAArray1 = new ArrayBuffer[Double]
+
         var lastIndex = sortedVolumeIndex.size-1
+
         for (index <- 0 until subScope) {
           var scopedDataFirst = sortedVolumeIndex.
             filter(x => x._2 >= 0 && x._2 <= (index + subScope)).
@@ -210,8 +248,30 @@ object Seasonality_final {
           postMAArray.append(secondScopedAverage)
         }
 
+        for (index <- 0 until subScope1) {
+          var scopedDataFirst = sortedVolumeIndex.
+            filter(x => x._2 >= 0 && x._2 <= (index + subScope1)).
+            map(x => {x._1})
+
+          var scopedSum = scopedDataFirst.sum
+          var scopedSize = scopedDataFirst.size
+          var scopedAverage = scopedSum/scopedSize
+          preMAArray1.append(scopedAverage)
+
+          var scopedDataLast = sortedVolumeIndex.
+            filter(x => { (  (x._2 >= (lastIndex - subScope1 - index)) &&
+              (x._2 <= lastIndex)    ) }).
+            map(x => {x._1})
+          var secondScopedSum = scopedDataLast.sum
+          var secondScopedSize = scopedDataLast.size
+          var secondScopedAverage = secondScopedSum/secondScopedSize
+          postMAArray1.append(secondScopedAverage)
+        }
+
         // 4. Merge all data-set for moving average
         var maResult = (preMAArray++movingResult++postMAArray.reverse).zipWithIndex
+
+        var maResult1 = (preMAArray1++stdevResult++postMAArray1.reverse).zipWithIndex
 
         //zip() : zip안에 오는 데이터 값을 앞에 있는 데이터에 붙여서 보여준다.
 
@@ -220,37 +280,65 @@ object Seasonality_final {
           zip(maResult).
           map(x=>{
 
-            var key = x._1._1.getString(keyNo)
-            var regionid = key.split("_")(0)
-            var product = key.split("_")(1)
+            var regionid = x._1._1.getString(regionidNo)
+            var product = x._1._1.getString(productNo)
             var yearweek = x._1._1.getString(yearweekNo)
             var volume = x._1._1.getDouble(qtyNo)
+            var volume_new = x._1._1.getDouble(qtyNewNo)
             var movingValue = x._2._1
             var ratio = 1.0d
             if(movingValue != 0.0d){
-              ratio = volume / movingValue
+              ratio = volume_new / movingValue
+            }else if(movingValue == 0.0d){
+              movingValue = 1.0d
+              ratio = volume_new / movingValue
             }
             var week = yearweek.substring(4,6)
-            Row(regionid, product, yearweek, week, volume.toString, movingValue.toString, ratio.toString)
+            Row(regionid, product, yearweek, week, volume.toString, volume_new.toString, movingValue.toString, ratio.toString)
           })
-        finalResult
+
+        var finalResult2 = finalResult.
+          zip(maResult1).
+          map(x=>{
+            var regionid = x._1.getString(regionidNo)
+            var product = x._1.getString(productNo)
+            var yearweek = x._1.getString(yearweekNo)
+            var volume = x._1.getString(qtyNo)
+            var volume_new = x._1.getString(qtyNewNo)
+            var movingValue = x._1.getString(6)
+            var stddValue = x._2._1
+            var ratio = 1.0d
+            if(stddValue != 0.0d){
+              ratio = volume_new.toDouble / stddValue
+            }else if(stddValue == 0.0d){
+              stddValue = 1.0d
+              ratio = volume_new.toDouble / stddValue
+            }
+            var week = yearweek.substring(4,6)
+            Row(regionid, product, yearweek, week, volume.toString, volume_new.toString, movingValue.toString, stddValue.toString, ratio.toString)
+          })
+        finalResult2
       })
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////  Data coonversion (RDD -> Dataframe) ///////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////
-    val middleResult = spark.createDataFrame(groupRddMapExp,
+    //volume = qty(실제판매량), volume = qty_new(실제판매량0처리), std(표준편차) : 변동률, MA: 이동평균(판매추세량), RATIO : 안정된 시장(QTY_NEW/MA)
+    //넣어야할 것 : upper_bound: 상한, lower bound: 하한, MA_NEW : 정제된 판매량, SMOOTH: 스무딩처리 값, RATIO_1: (QTY_NEW/SMOOTH), RATIO_2: (MA_NEW/SMOOTH)
+    val middleResult = spark.createDataFrame(groupRddMapExp1,
       StructType(Seq(StructField("REGIONID", StringType),
         StructField("PRODUCT", StringType),
         StructField("YEARWEEK", StringType),
         StructField("WEEK", StringType),
         StructField("VOLUME", StringType),
+        StructField("VOLUME_NEW", StringType),
         StructField("MA", StringType),
+        StructField("STD", StringType),
         StructField("RATIO", StringType))))
 
     middleResult.createOrReplaceTempView("middleTable")
 
-    var finalResultDf = spark.sqlContext.sql("select REGIONID, PRODUCT, WEEK, AVG(VOLUME) AS AVG_VOLUME, AVG(MA) AS AVG_MA," +
+    var finalResultDf = spark.sqlContext.sql("select REGIONID, PRODUCT, WEEK, AVG(VOLUME_NEW) AS AVG_VOLUME_NEW, AVG(MA) AS AVG_MA, AVG(STD) AS STD," +
       " AVG(RATIO) AS AVG_RATIO from middleTable group by REGIONID, PRODUCT, WEEK")
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -268,7 +356,7 @@ object Seasonality_final {
     prop.setProperty("driver", "oracle.jdbc.OracleDriver")
     prop.setProperty("user", staticUser)
     prop.setProperty("password", staticPw)
-    val table = "kopo_batch_season_result"
+    val table = "kopo_project_채성은"
 
     //staticUrl = "jdbc:oracle:thin:@127.0.0.1:1521/XE"
 
